@@ -1,5 +1,9 @@
 ## Requirements for Trivia Game 
 
+### Technical requirements 
+- Run through github pages
+- Host can send join link to connect contestants to game 
+
 ### Questions requirements 
 - Each question should be displayed on its own page
 - Each question page could contain one of the following:
