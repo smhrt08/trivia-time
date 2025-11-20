@@ -1,7 +1,7 @@
 // Shared helpers and Supabase initialization
 // Replace with your Supabase project's URL and ANON key
-const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
+const SUPABASE_URL = "https://xvawqzkndkstkxjvasch.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2YXdxemtuZGtzdGt4anZhc2NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1ODY1MDQsImV4cCI6MjA3OTE2MjUwNH0.rRcG-aqUaQRs4G9eFCuX2V6gLGHQW7udhzbWFVGs_ck";
 
 if (!window.supabaseClient) {
   // supabase global is provided by the UMD bundle
