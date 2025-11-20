@@ -1,4 +1,4 @@
-// Host logic using Supabase
+// Host logic using Supabase (improved reactivity and subscription handling)
 let currentSessionId = null;
 let sessionRow = null;
 let subscription = null;
@@ -14,23 +14,32 @@ document.addEventListener('DOMContentLoaded', () => {
   el('update-display').addEventListener('click', updateDisplayNow);
   el('add-team').addEventListener('click', onAddTeam);
   el('submit-scores').addEventListener('click', showScoreboard);
+
+  // If the host page loads with ?session=<id>, subscribe to that session
+  const param = getSessionParam();
+  if(param){
+    joinExistingSessionAsHost(param);
+  }
 });
 
-async function onCreateSession(){
-  const id = makeId(5);
-  try{
-    await createSessionRow(id);
-    currentSessionId = id;
+async function joinExistingSessionAsHost(sessionId){
+  try {
+    const { data, error } = await getSessionRow(sessionId);
+    if(error || !data) {
+      console.warn('Session not found:', error);
+      return;
+    }
+    currentSessionId = sessionId;
+    sessionRow = data;
     el('session-info').classList.remove('hidden');
-    el('session-id').innerText = id;
-    const link = `${location.origin}${location.pathname.replace('host.html','contestant.html')}?session=${id}`;
+    el('session-id').innerText = sessionId;
+    const link = `${location.origin}${location.pathname.replace('host.html','contestant.html')}?session=${sessionId}`;
     el('join-link').href = link;
     el('join-link').innerText = link;
     document.querySelectorAll('.card').forEach(c=>c.classList.remove('hidden'));
-    const { data } = await getSessionRow(id);
-    sessionRow = data;
-    if(subscription) subscription.unsubscribe();
-    subscription = subscribeSession(id, async (newRow) => {
+    // ensure any existing subscription removed
+    if(subscription) unsubscribeSession(subscription);
+    subscription = subscribeSession(sessionId, (newRow) => {
       sessionRow = newRow;
       renderQuestions();
       renderTeams();
@@ -39,6 +48,17 @@ async function onCreateSession(){
     // initial render
     renderQuestions();
     renderTeams();
+  } catch(err){
+    console.error('Failed to join session as host', err);
+  }
+}
+
+async function onCreateSession(){
+  const id = makeId(5);
+  try{
+    await createSessionRow(id);
+    // reuse join logic to subscribe
+    await joinExistingSessionAsHost(id);
   }catch(err){
     alert('Failed to create session: '+(err.message || JSON.stringify(err)));
   }
@@ -61,6 +81,7 @@ function renderQuestions(){
 }
 
 window.hostGoToQuestion = async function(i){
+  if(!currentSessionId) return alert('No session active.');
   await supabase.from('sessions').update({ current: { type: 'question', index: i } }).eq('id', currentSessionId);
 };
 
@@ -69,13 +90,20 @@ window.hostEditQuestion = function(i){
   const newText = prompt('Question text:', q.text||'');
   if(newText===null) return;
   q.text = newText;
-  supabase.from('sessions').update({ questions: sessionRow.questions }).eq('id', currentSessionId);
+  // update DB and immediately update UI
+  supabase.from('sessions').update({ questions: sessionRow.questions }).eq('id', currentSessionId).then(res=>{
+    if(res.error) console.error(res.error);
+    else renderQuestions();
+  });
 };
 
 window.hostDeleteQuestion = function(i){
   if(!confirm('Delete question?')) return;
   sessionRow.questions.splice(i,1);
-  supabase.from('sessions').update({ questions: sessionRow.questions }).eq('id', currentSessionId);
+  supabase.from('sessions').update({ questions: sessionRow.questions }).eq('id', currentSessionId).then(res=>{
+    if(res.error) console.error(res.error);
+    else renderQuestions();
+  });
 };
 
 async function onAddQuestion(){
@@ -97,7 +125,10 @@ async function onAddQuestion(){
   }
   sessionRow.questions = sessionRow.questions || [];
   sessionRow.questions.push(question);
-  await supabase.from('sessions').update({ questions: sessionRow.questions }).eq('id', currentSessionId);
+  // update DB and re-render immediately on success
+  const { data, error } = await supabase.from('sessions').update({ questions: sessionRow.questions }).eq('id', currentSessionId);
+  if(error) { console.error(error); alert('Failed to add question'); return; }
+  renderQuestions();
 }
 
 async function changeIndex(delta){
@@ -137,7 +168,10 @@ function renderTeams(){
 window.hostRemoveTeam = function(id){
   if(!confirm('Remove team?')) return;
   delete sessionRow.teams[id];
-  supabase.from('sessions').update({ teams: sessionRow.teams }).eq('id', currentSessionId);
+  supabase.from('sessions').update({ teams: sessionRow.teams }).eq('id', currentSessionId).then(res=>{
+    if(res.error) console.error(res.error);
+    else renderTeams();
+  });
 };
 
 window.hostEditTeam = function(id){
@@ -147,7 +181,10 @@ window.hostEditTeam = function(id){
   t.name = newName;
   const newScore = parseInt(prompt('Score:', t.score||0),10);
   t.score = isNaN(newScore)?(t.score||0):newScore;
-  supabase.from('sessions').update({ teams: sessionRow.teams }).eq('id', currentSessionId);
+  supabase.from('sessions').update({ teams: sessionRow.teams }).eq('id', currentSessionId).then(res=>{
+    if(res.error) console.error(res.error);
+    else renderTeams();
+  });
 };
 
 async function onAddTeam(){
@@ -156,7 +193,9 @@ async function onAddTeam(){
   const id = makeId(6);
   sessionRow.teams = sessionRow.teams||{};
   sessionRow.teams[id] = { name, photoUrl: '', score: 0 };
-  await supabase.from('sessions').update({ teams: sessionRow.teams }).eq('id', currentSessionId);
+  const { data, error } = await supabase.from('sessions').update({ teams: sessionRow.teams }).eq('id', currentSessionId);
+  if(error) { console.error(error); alert('Failed to add team'); return; }
+  renderTeams();
 }
 
 // Scoreboard / Chart
