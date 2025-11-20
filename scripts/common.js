@@ -36,15 +36,37 @@ function getSessionRow(sessionId){
   return supabase.from('sessions').select('*').eq('id', sessionId).single();
 }
 
-// Realtime subscription helper
+// Realtime subscription helper using .from(...).on(...) pattern
+// callback receives the updated row (payload.new)
 function subscribeSession(sessionId, callback){
-  // subscribe to changes on the sessions row
-  const channel = supabase.channel(`public:sessions:id=eq.${sessionId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, payload=>{
+  // remove any subscription for same topic if exists (safe to call)
+  // Create a subscription that listens for UPDATE and INSERT on the single row
+  const realtimeTopic = `sessions:id=eq.${sessionId}`;
+  const subscription = supabase
+    .channel(realtimeTopic)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, payload => {
+      if(payload && payload.new) callback(payload.new);
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, payload => {
       if(payload && payload.new) callback(payload.new);
     })
     .subscribe();
-  return channel;
+
+  return subscription;
+}
+
+// cleanly unsubscribe a subscription returned by subscribeSession
+async function unsubscribeSession(subscription){
+  if(!subscription) return;
+  try {
+    await supabase.removeChannel(subscription);
+  } catch(e){
+    console.warn('Failed to remove subscription', e);
+    // fallback: try unsubscribe method if present
+    if(subscription.unsubscribe) {
+      try { subscription.unsubscribe(); } catch(_e) {}
+    }
+  }
 }
 
 function getSessionParam(){
