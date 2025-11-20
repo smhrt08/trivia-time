@@ -48,10 +48,18 @@ async function onSubmitTeam(){
   if(error || !data){ alert('Session vanished'); return; }
   const teams = data.teams || {};
   teams[teamId] = { name, photoUrl, score: 0 };
-  await supabase.from('sessions').update({ teams }).eq('id', sessionId);
+  const { error: updErr } = await supabase.from('sessions').update({ teams }).eq('id', sessionId);
+  if(updErr){
+    console.error(updErr);
+    alert('Failed to register team');
+    return;
+  }
+  // UI: show buzzer panel immediately
   el('buzzer-panel').classList.remove('hidden');
   el('join-panel').classList.add('hidden');
   alert('Team registered!');
+  // optional: keep local copy
+  sessionRow = Object.assign({}, data, { teams });
 }
 
 async function onBuzz(){
