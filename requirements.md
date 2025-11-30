@@ -5,13 +5,15 @@
 - Host can send join link to connect contestants to game 
 
 ### Questions requirements 
-- Each question should be displayed on its own page
+- The questions for each game will be supplied from a json file that is selected by the host
+- All json files in the /games folder will be available for selection by the host 
 - Each question page could contain one of the following:
   1. A text question with 4 multiple choice options
   2. A video player that will play a video clip
   3. A text question with a picture and 4 multiple choice options
-- The questions should be able to be configured within the site page and saved there for future uses
-- A reveal page for each question can be displayed and highlights the answer from the multiple choice options or the correct answer will be displayed
+- Each question should be displayed on its own page to the participants by the host
+- Text questions can also contain img assets that can be displayed on the page along with the question and multiple choice options 
+- A reveal page for each question can be displayed by the host to the participants and highlights the answer from the multiple choice options or the correct answer will be displayed 
 
 ### Host mode requirements 
 - A host needs to see different display on a different device but have it control navigation on another device 
@@ -19,9 +21,9 @@
 - Host device is linked via host code
 - Only 1 host is allowed
 - Host can see all pages and navigate between them before updating the display
-- Display update will happen via a button click
-- Host can add and remove teams and edit their details
-- Host has a scorecard that can be updated and submitted
+- Display update will happen via a button click 
+- Host can add and remove teams and edit their details 
+- Host has a scorecard that can be updated and submitted 
 
 ### Contestant mode requirements 
 - Contestants can submit a team name to the site
