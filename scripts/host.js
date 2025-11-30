@@ -1,157 +1,82 @@
-// Host logic using Supabase (improved reactivity and repo-game loader)
-let currentSessionId = null;
-let sessionRow = null;
-let subscription = null;
-
-const el = id => document.getElementById(id);
-
-document.addEventListener('DOMContentLoaded', () => {
-  el('create-session').addEventListener('click', onCreateSession);
-  el('add-question').addEventListener('click', onAddQuestion);
-  el('prev').addEventListener('click', ()=>changeIndex(-1));
-  el('next').addEventListener('click', ()=>changeIndex(1));
-  el('reveal').addEventListener('click', ()=>setReveal(true));
-  el('update-display').addEventListener('click', updateDisplayNow);
-  el('add-team').addEventListener('click', onAddTeam);
-  el('submit-scores').addEventListener('click', showScoreboard);
-
-  // Wire up repo games UI controls
-  el('refresh-repo-games').addEventListener('click', populateRepoGameSelect);
-  el('load-repo-game').addEventListener('click', onLoadSelectedRepoGame);
-
-  // If the host page loads with ?session=<id>, subscribe to that session
-  const param = getSessionParam();
-  if(param){
-    joinExistingSessionAsHost(param);
-  } else {
-    // show repo-games controls so host can create session from template
-    document.getElementById('repo-games').classList.remove('hidden');
-    populateRepoGameSelect();
-  }
-});
-
 async function populateRepoGameSelect(){
   const select = el('repo-game-select');
   select.innerHTML = '<option value="">-- loading list --</option>';
   const preview = el('repo-game-preview');
   preview.innerText = '';
+
+  const owner = 'smhrt08';
+  const repo = 'trivia-time';
+  const repoApi = `https://api.github.com/repos/${owner}/${repo}`;
+
   try {
-    // Use GitHub Contents API to list files in /games
-    const apiUrl = 'https://api.github.com/repos/smhrt08/trivia-time/contents/games';
-    const resp = await fetch(apiUrl);
-    if(!resp.ok){
-      if(resp.status === 404){
-        select.innerHTML = '<option value="">(no /games folder found)</option>';
-        return;
-      }
-      throw new Error('GitHub API error: ' + resp.status);
+    // 1) get repo metadata so we know the default branch
+    const repoResp = await fetch(repoApi);
+    if(!repoResp.ok){
+      console.warn('Repo metadata fetch failed', repoResp.status, repoResp.statusText);
+      select.innerHTML = `<option value="">(failed to access repo: ${repoResp.status})</option>`;
+      preview.innerText = 'If repository is private, the site cannot list files via GitHub API.';
+      return;
     }
-    const files = await resp.json();
-    // files is an array of items with name, path, download_url, type
+    const repoMeta = await repoResp.json();
+    const branch = repoMeta.default_branch || 'main';
+
+    // 2) fetch the repo tree recursively for that branch
+    const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+    const treeResp = await fetch(treeUrl);
+    if(!treeResp.ok){
+      console.warn('Tree fetch failed', treeResp.status, treeResp.statusText);
+      select.innerHTML = `<option value="">(failed to read branch tree: ${treeResp.status})</option>`;
+      preview.innerText = 'Make sure the branch exists and repo is public, or use the fallback index file.';
+      return;
+    }
+    const treeData = await treeResp.json();
+    if(!treeData.tree || treeData.tree.length === 0){
+      select.innerHTML = '<option value="">(no files found)</option>';
+      return;
+    }
+
+    // 3) filter for files under games/ that end with .json
+    const files = treeData.tree
+      .filter(item => item.type === 'blob' && item.path.startsWith('games/') && item.path.toLowerCase().endsWith('.json'))
+      .map(item => ({ path: item.path }));
+
+    if(files.length === 0){
+      select.innerHTML = '<option value="">(no .json files in /games)</option>';
+      preview.innerText = `Tip: Add a JSON template under /games on the ${branch} branch.`;
+      return;
+    }
+
+    // 4) populate select with raw.githubusercontent URLs using the branch we discovered
     select.innerHTML = '<option value="">-- select a game --</option>';
-    files.filter(f => f.type === 'file' && f.name.toLowerCase().endsWith('.json')).forEach(f => {
+    files.forEach(f => {
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURIComponent(f.path)}`;
+      const name = f.path.split('/').pop();
       const opt = document.createElement('option');
-      opt.value = f.download_url;
-      opt.dataset.name = f.name;
-      opt.text = f.name;
+      opt.value = rawUrl;
+      opt.dataset.path = f.path;
+      opt.text = name;
       select.appendChild(opt);
     });
-    // preview when selection changes
+
+    // 5) preview and on-change handler
     select.onchange = async () => {
       const url = select.value;
       if(!url){ preview.innerText = ''; return; }
       try{
         const r = await fetch(url);
+        if(!r.ok) { preview.innerText = `Preview failed (${r.status})`; return; }
         const json = await r.json();
         const qcount = (json.questions && json.questions.length) || 0;
-        preview.innerText = `${select.selectedOptions[0].dataset.name} — ${qcount} question(s)`;
-      }catch(e){
-        preview.innerText = 'Preview failed';
+        preview.innerText = `${select.selectedOptions[0].dataset.path} — ${qcount} question(s)`;
+      } catch(e){
+        console.error('Preview fetch error', e);
+        preview.innerText = 'Preview failed (see console)';
       }
     };
+
   } catch(err){
-    console.error('Failed to list repo games', err);
-    select.innerHTML = '<option value="">(failed to load list)</option>';
+    console.error('populateRepoGameSelect error', err);
+    select.innerHTML = '<option value="">(error loading list)</option>';
+    preview.innerText = 'Check console for details (CORS, rate-limits, or private repo).';
   }
 }
-
-async function onLoadSelectedRepoGame(){
-  const select = el('repo-game-select');
-  const downloadUrl = select.value;
-  if(!downloadUrl) return alert('Select a game file first');
-  try {
-    const resp = await fetch(downloadUrl);
-    if(!resp.ok) throw new Error('Failed to download game JSON');
-    const gameJson = await resp.json();
-    // validate
-    if(!gameJson.questions || !Array.isArray(gameJson.questions)){
-      return alert('Invalid game JSON: missing questions array');
-    }
-    // create session pre-populated with template questions
-    const newSessionId = makeId(6);
-    const initial = {
-      id: newSessionId,
-      host_active: true,
-      current: { type: 'waiting', index: -1 },
-      questions: gameJson.questions,
-      teams: {},
-      chase: {}
-    };
-    const { data, error } = await supabase.from('sessions').insert([initial]);
-    if(error){
-      console.error('Failed to create session from template', error);
-      return alert('Failed to create session');
-    }
-    // join the newly created session as host
-    await joinExistingSessionAsHost(newSessionId);
-  } catch(err){
-    console.error('Load template failed', err);
-    alert('Failed to load template: '+(err.message||err));
-  }
-}
-
-// rest of host.js functions (joinExistingSessionAsHost, renderQuestions, onCreateSession, etc...)
-// If your existing host.js already has these functions, keep them as is.
-// For clarity they are left unchanged below:
-
-async function joinExistingSessionAsHost(sessionId){
-  try {
-    const { data, error } = await getSessionRow(sessionId);
-    if(error || !data) {
-      console.warn('Session not found:', error);
-      return;
-    }
-    currentSessionId = sessionId;
-    sessionRow = data;
-    el('session-info').classList.remove('hidden');
-    el('session-id').innerText = sessionId;
-    const link = `${location.origin}${location.pathname.replace('host.html','contestant.html')}?session=${sessionId}`;
-    el('join-link').href = link;
-    el('join-link').innerText = link;
-    document.querySelectorAll('.card').forEach(c=>c.classList.remove('hidden'));
-    if(subscription) unsubscribeSession(subscription);
-    subscription = subscribeSession(sessionId, (newRow) => {
-      sessionRow = newRow;
-      renderQuestions();
-      renderTeams();
-      el('current-index').innerText = (sessionRow.current && sessionRow.current.index>=0) ? sessionRow.current.index : '-';
-    });
-    renderQuestions();
-    renderTeams();
-  } catch(err){
-    console.error('Failed to join session as host', err);
-  }
-}
-
-async function onCreateSession(){
-  const id = makeId(5);
-  try{
-    await createSessionRow(id);
-    await joinExistingSessionAsHost(id);
-  }catch(err){
-    alert('Failed to create session: '+(err.message || JSON.stringify(err)));
-  }
-}
-
-// (keep other helpers: renderQuestions, hostGoToQuestion, hostEditQuestion, hostDeleteQuestion, onAddQuestion, changeIndex, setReveal, updateDisplayNow, renderTeams, hostRemoveTeam, hostEditTeam, onAddTeam, showScoreboard)
-// For brevity these remain as in your existing host.js file; the added code above integrates the repo loader.
