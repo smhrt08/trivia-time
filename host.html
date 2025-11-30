@@ -20,6 +20,18 @@
       </div>
     </section>
 
+    <!-- NEW: Load game from repo/games folder -->
+    <section id="repo-games" class="card hidden">
+      <h3>Load preuploaded game (from /games folder)</h3>
+      <p>Choose a JSON file from the repository's /games folder to create a session pre-filled with its questions.</p>
+      <div>
+        <select id="repo-game-select"><option value="">-- loading list --</option></select>
+        <button id="refresh-repo-games" class="btn">Refresh List</button>
+        <button id="load-repo-game" class="btn primary">Create Session From Selected Game</button>
+      </div>
+      <div id="repo-game-preview" style="margin-top:.5rem;color:#444"></div>
+    </section>
+
     <section id="question-editor" class="card hidden">
       <h2>Questions</h2>
       <div id="questions-list"></div>
