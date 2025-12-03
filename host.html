@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Host — Chase Timer</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h2>Host — Chase Timer</h2>
+      <div class="small muted">Keyboard: Space = Start/Stop, Enter = +1, Delete = -1, S = Switch Team, R = Reset Timer</div>
+    </header>
+
+    <section class="panel">
+      <div class="row">
+        <div>
+          <label>Session code</label>
+          <div id="sessionCode" class="code">—</div>
+          <div class="small muted">Share this code with displays</div>
+        </div>
+
+        <div>
+          <label>Start seconds</label>
+          <input id="startSeconds" type="number" min="5" value="60">
+        </div>
+
+        <div>
+          <label>Chunks</label>
+          <input id="chunks" type="number" min="1" value="5">
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="createSession" class="btn">Create Session</button>
+        <button id="releaseHost" class="btn ghost">Release Host</button>
+        <button id="resetAll" class="btn ghost">Reset All</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div>
+        <div class="timer" id="timerDisplay">00:00</div>
+      </div>
+
+      <div class="counters">
+        <div class="counter card">
+          <div>
+            <div class="label">Team 1 <span id="team1Saved" class="small muted">(not saved)</span></div>
+          </div>
+          <div class="big" id="team1">0</div>
+        </div>
+
+        <div class="counter card">
+          <div>
+            <div class="label">Team 2 <span id="team2Saved" class="small muted">(not saved)</span></div>
+          </div>
+          <div class="big" id="team2">0</div>
+        </div>
+      </div>
+
+      <div class="controls small">
+        <button id="toggleTimer" class="btn">Start/Stop</button>
+        <button id="incBtn" class="btn">+1</button>
+        <button id="decBtn" class="btn ghost">-1</button>
+        <button id="switchBtn" class="btn">Switch Team (S)</button>
+        <button id="resetTimerBtn" class="btn ghost">Reset Timer</button>
+      </div>
+
+      <div class="small muted" style="margin-top:8px;">
+        Active team:
+        <select id="activeTeam">
+          <option value="1">Team 1</option>
+          <option value="2">Team 2</option>
+        </select>
+      </div>
+    </section>
+
+    <footer class="small muted">
+      Make sure to set SUPABASE_URL and SUPABASE_ANON_KEY in <code>js/supabaseClient.js</code> before using.
+    </footer>
+  </main>
+
+  <script type="module">
+    import { initHost } from './js/host.js';
+    initHost();
+  </script>
+</body>
+</html>
