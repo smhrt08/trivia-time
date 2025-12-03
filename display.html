@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Display — Chase Timer</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="display-container">
+    <div class="topbar">
+      <div class="muted small">Enter host code to connect</div>
+      <div>
+        <input id="joinCode" placeholder="ABC123" />
+        <button id="joinBtn" class="btn">Join</button>
+      </div>
+      <div id="status" class="small muted">Not connected</div>
+    </div>
+
+    <section class="display-panel">
+      <div id="timerLarge" class="timer-large">00:00</div>
+      <div id="chunksBar" class="chunks-bar"></div>
+
+      <div class="score-row">
+        <div class="score-card" id="displayTeam1">
+          <div class="label">Team 1</div>
+          <div class="score big" id="dispTeam1Val">0</div>
+          <div class="saved small muted" id="dispTeam1Saved">(not saved)</div>
+        </div>
+
+        <div class="score-card" id="displayTeam2">
+          <div class="label">Team 2</div>
+          <div class="score big" id="dispTeam2Val">0</div>
+          <div class="saved small muted" id="dispTeam2Saved">(not saved)</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initDisplay } from './js/display.js';
+    initDisplay();
+  </script>
+</body>
+</html>
